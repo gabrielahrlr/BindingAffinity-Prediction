@@ -72,7 +72,7 @@ if (is.null(opt$val)){
   xval <- xtrain_fool[-idx,]
   xval <- as.data.frame(xval)
   yval <- ytrain_fool[-idx,]
-  yval <- as.data.frame(yvall)
+  yval <- as.data.frame(yval)
 } else{
   val <- read.csv(opt$val, header = TRUE)
   complex_val <- val[1]

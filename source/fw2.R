@@ -1,11 +1,14 @@
 #!/usr/bin/env Rscript
 ########################################################################################
 # STACKING FRAMEWORK
-# @author: Gabriela HERNANDEZ
-# @example: Rscript --vanilla stacking.R -a set1_sfs.csv -b set2_sfs.csv 
+# @author: Gabriela HERNANDEZ LARIOS
+# @description: 
+# @example with
+# @example with validation dataset: Rscript --vanilla stacking.R -a set1_sfs.csv -b set2_sfs.csv 
 #           -d set1_all_descriptors.csv -e set2_all_descriptors.csv 
+#
 # ######################################################################################
-
+library(hydroGOF)
 ########################################################################################
 # ARGUMENTS INPUT  PROCESSING
 # This section performs input processing for the arguments that have to be passed and
@@ -162,42 +165,71 @@ source('models.R')
 print(paste("Learning Models for descriptors and SFs..."))
 
 # Learning Process for Descriptors
+
+#  LASSO
 lasso_des <- lasso(x = xall.z, y = yall)
-lasso_error_des <- sqrt(mean(lasso_des$lasso_cv$cvm))
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models
+#lasso_error_des_train <- sqrt(mean(lasso_des$lasso_cv$cvm)) 
+lasso_error_pred <- predict(lasso_des$lasso_model,  newx = as.matrix(xall_val.z))
+lasso_error_des <- rmse(as.numeric(lasso_error_pred[,1]),yall_val[,1])
+
+# Elastic Net
 eNet_des <- eNet(x = xall.z, y = yall)
-eNet_error_des <- sqrt(mean(eNet_des$eNet_cv$cvm))
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models
+#eNet_error_des_train <- sqrt(mean(eNet_des$eNet_cv$cvm))
+eNet_error_pred <- predict(eNet_des$eNet_model,  newx = as.matrix(xall_val.z))
+eNet_error_des <- rmse(as.numeric(eNet_error_pred[,1]), yall_val[,1])
+
+# GAM
 gam_des <- gam_m(xall.z, yall)
-gam_error_des <- sqrt(mean(gam_des$gam_model$gcv.ubre))
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models
+# gam_error_des_train <- sqrt(mean(gam_des$gam_model$gcv.ubre))
+gam_error_pred <- predict(gam_des$gam_model, xall_val.z)
+gam_error_des <- rmse(as.numeric(gam_error_pred), yall_val[,1])
+
+
+# KRLS
 krls_des <- krls_m(xall.z, yall)
-krls_error_des <- predict(krls_des$krls_model, xall.z)
-krls_error_des <- evaluation(krls_error_des$fit, yall)
-krls_error_des <- round(krls_error_des$RMSE, 3)
-model <- c("lasso", "ElasticNet", "GAM", "KRLS")
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models
+#krls_error_des_train <- (krls_des$krls_model$Looe[,1])/nrow(xall.z)
+krls_error_pred <- predict(krls_des$krls_model, xall_val.z)
+krls_error_des <- rmse(krls_error_pred$fit, yall_val)
+
+# Choose the Best Model 
+models <- c("LASSO", "ElasticNet", "GAM", "KRLS")
 performance_vec <- c(lasso_error_des, eNet_error_des, gam_error_des, krls_error_des)
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models, default is to use a validation set.
+# performance_vec <- c(lasso_error_des_train, eNet_error_des_train, gam_error_des_train, krls_error_des_train)
 best_model_all <- which.min(performance_vec)
+print("Best Model of the combination of SFs and Descriptors together:")
+print(models[best_model_all])
 
 
 # Best Model: LASSO
 if(best_model_all == 1){
-  best_train_all <- predict(lasso_des$lasso_model, newx = xall.z)
-  best_val_all <- predict(lasso_des$lasso_model, newx = xall_val.z)
+  best_train_all <- predict(lasso_des$lasso_model, newx = as.matrix(xall.z))
+  best_val_all <- predict(lasso_des$lasso_model, newx = as.matrix(xall_val.z))
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
-    best_new_all <- predict(lasso_des$lasso_model, newx = xall_new.z)
+    best_new_all <- predict(lasso_des$lasso_model, newx = as.matrix(xall_new.z))
   }
 }
 
 # Best Model: Elastic Net
 if(best_model_all == 2){
-  best_train_all <- predict(eNet_des$eNet_model, newx = xall.z)
-  best_val_all <- predict(eNet_des$eNet_model, newx = xall_val.z)
+  best_train_all <- predict(eNet_des$eNet_model, newx = as.matrix(xall.z))
+  best_val_all <- predict(eNet_des$eNet_model, newx = as.matrix(xall_val.z))
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
-    best_new_all <- predict(eNet_des$eNet_model, newx = xall_new.z)
+    best_new_all <- predict(eNet_des$eNet_model, newx = as.matrix(xall_new.z))
   }
 }
 
 # Best Model: GAM
 if(best_model_all == 3){
-  
   best_train_all <- predict(gam_des$gam_model,  xall.z)
   best_val_all <- predict(gam_des$gam_model, xall_val.z)
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
@@ -220,31 +252,51 @@ if(best_model_all == 4){
 
 # LEARNING MODELS FOR SFs
 print("Learning Models for SFs...")
-# Learning Process for SFs
+
 # LASSO
 lasso_sfs <- lasso(x = xsfs.z, y = ysfs)
-lasso_error_sfs <- sqrt(mean(lasso_sfs$lasso_cv$cvm))
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models
+# lasso_error_sfs_train <- sqrt(mean(lasso_sfs$lasso_cv$cvm))
+lasso_error_sfs_pred <- predict(lasso_sfs$lasso_model, newx = as.matrix(xsfs_val.z))
+lasso_error_sfs <- rmse(as.numeric(lasso_error_sfs_pred[,1]), ysfs_val[,1])
 
 # Elastic Net
 eNet_sfs <- eNet(x = xsfs.z, y = ysfs)
-eNet_error_sfs <- sqrt(mean(eNet_sfs$eNet_cv$cvm))
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models
+# eNet_error_sfs_train <- sqrt(mean(eNet_sfs$eNet_cv$cvm))
+eNet_error_sfs_pred <- predict(eNet_sfs$eNet_model, newx = as.matrix(xsfs_val.z))
+eNet_error_sfs <- rmse(as.numeric(eNet_error_sfs_pred[,1]), ysfs_val[,1])
 
 # GAM
 gam_sfs <- gam_m(xsfs.z, ysfs)
-gam_error_sfs <- sqrt(mean(gam_sfs$gam_model$gcv.ubre))
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models
+# gam_error_sfs_train <- sqrt(mean(gam_sfs$gam_model$gcv.ubre))
+gam_error_sfs_pred <- predict(gam_sfs$gam_model,xsfs_val.z)
+gam_error_sfs <- rmse(as.numeric(gam_error_sfs_pred), ysfs_val[,1])
 
 # KRLS
 krls_sfs <- krls_m(xsfs.z, ysfs)
-krls_error_sfs <- predict(krls_sfs$krls_model, xsfs.z)
-krls_error_sfs <- evaluation(krls_error_sfs$fit, ysfs)
-krls_error_sfs <- round(krls_error_sfs$RMSE, 3)
-model <- c("lasso", "ElasticNet", "GAM", "KRLS")
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models
+#krls_error_sfs_train <- (krls_sfs$krls_model$Looe[,1])/nrow(xsfs.z)
+krls_error_sfs_pred <- predict(krls_sfs$krls_model, xsfs_val.z)
+krls_error_sfs <- rmse(krls_error_sfs_pred$fit, ysfs_val)
+
+models <- c("LASSO", "ElasticNet", "GAM", "KRLS")
 performance_vec_sfs <- c(lasso_error_sfs, eNet_error_sfs, gam_error_sfs, krls_error_sfs)
+# Uncomment the bellow  line if you want to use the error in the training 
+# for choosing the best models, default is to use a validation set.
+#performance_vec_sfs <- c(lasso_error_sfs_train, eNet_error_sfs_train, gam_error_sfs_train, krls_error_sfs_train)
 best_model_sfs <- which.min(performance_vec_sfs) 
+print("Best Model of the combination of only SFs:")
+print(models[best_model_sfs])
+
 
 # Best Model: LASSO
 if(best_model_sfs == 1){
-  
   best_train_sfs <- predict(lasso_sfs$lasso_model, newx = xsfs.z)
   best_val_sfs <- predict(lasso_sfs$lasso_model, xsfs_val.z)
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
@@ -254,7 +306,6 @@ if(best_model_sfs == 1){
 
 # Best Model: Elastic Net
 if(best_model_sfs == 2){
-  
   best_train_sfs <- predict(eNet_sfs$eNet_model, newx = xsfs.z)
   best_val_sfs <- predict(eNet_sfs$eNet_model, newx = xsfs_val.z)
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
@@ -264,7 +315,6 @@ if(best_model_sfs == 2){
 
 # Best Model: GAM
 if(best_model_sfs == 3){
-  
   best_train_sfs <- predict(gam_sfs$gam_model,  xsfs.z)
   best_val_sfs <- predict(gam_sfs$gam_model, xsfs_val.z)
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
@@ -280,7 +330,7 @@ if(best_model_sfs == 4){
   best_val_sfs <- best_val_sfs$fit
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
     best_new_sfs <- predict(krls_sfs$krls_model, xsfs_new.z)
-    best_new_sfs <- best_new_all$fit
+    best_new_sfs <- best_new_sfs$fit
   }
 }
 
@@ -324,7 +374,8 @@ stack_val_res <- predict(ridge_stack_model$ridge_model, newx = as.matrix(xmodels
 if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
   stack_new_res <- predict(ridge_stack_model$ridge_model, newx = as.matrix(xmodels_new))
   newdata_results <- cbind(best_new_sfs, best_new_all, stack_new_res)
-  write.cvs(newdata_results, "newdata_predictions.csv")
+  colnames(newdata_results) <- c("Best_SFs", "Best_SFs_Des", "Ridge_Stack")
+  write.csv(newdata_results, "newdata_predictions.csv")
 }
 
 
@@ -338,13 +389,13 @@ print("Evaluation SFs + descriptors")
 print("Pearson Correlation:")
 print(cor(best_val_all, ymodels_val[,1]))
 print("RMSE:")
-print(rmse(best_val_all[,1], ymodels_val[,1]))
+print(rmse(as.numeric(best_val_all), ymodels_val[,1]))
 
 print("Evaluation SFs")
 print("Pearson Correlation:")
 print(cor(best_val_sfs, ymodels_val[,1]))
 print("RMSE:")
-print(rmse(best_val_sfs[,1], ymodels_val[,1]))
+print(rmse(as.numeric(best_val_sfs), ymodels_val[,1]))
 
 
 print("Evaluation Ridge")
@@ -386,6 +437,3 @@ pdf("Stacking_Results.pdf")
 plot(ridge_stack_model$ridge_cv$glmnet.fit, "lambda", label=TRUE, main = "Ridge 1 Fold CV Lambda")
 plot(ridge_stack_model$ridge_cv, main = "Ridge shrinkage of coefficients")
 dev.off()
-
-
-
