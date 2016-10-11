@@ -1,7 +1,12 @@
 ##############################################################################################
-#    Models Function: Ridge, LASSO, Elastic Net, GAM, KRLS 
+#    Models Function: Ridge, LASSO, Elastic Net, GAM, KRLS
 #    @author: Gabriela Hernández
-#    EM-DMKM 2014-2016
+#    @description: This script  contains the four models used by the fw1.R and fw2.R codes.
+#    @author: Gabriela HERNANDEZ LARIOS
+#    EM-DMKM   2014-2016
+#    @contributions: Jorge ESTRADA
+#                    Jelisa IGLESIAS
+#    BSC-CNS 2016
 ##############################################################################################
 library(glmnet)
 library(KRLS)
@@ -10,7 +15,6 @@ library(caret)
 library(ggplot2)
 library(caret)
 library(hydroGOF)
-
 ###################################################################################
 #    Model Functions
 ###################################################################################
@@ -24,7 +28,7 @@ lasso <- function(x, y){
   # the parameters
   #
   # Args:
-  #   x :   predictors (independent variables) matrix/df of the training, 
+  #   x :   predictors (independent variables) matrix/df of the training,
   #         centered to zero with a standard deviation of 1.
   #   y :   response (dependent or target) variable.
   # Returns:
@@ -36,7 +40,7 @@ lasso <- function(x, y){
   #                          This object can be used to predict new data.
 
   # x is already standardize, so do not standardize it again
-  
+
   lasso_cv <- cv.glmnet(x = as.matrix(x), y = y[,1], alpha = 1, standardize=FALSE)
   lasso_model <- glmnet(x = as.matrix(x), y = y[,1], alpha = 1, standardize=FALSE,
                         lambda = lasso_cv$lambda.1se)
@@ -52,7 +56,7 @@ eNet <- function(x, y){
   # the parameters
   #
   # Args:
-  #   x :   predictors (independent variables) matrix/df of the training, 
+  #   x :   predictors (independent variables) matrix/df of the training,
   #         centered to zero with a standard deviation of 1.
   #   y :   response (dependent or target) variable.
   # Returns:
@@ -62,7 +66,7 @@ eNet <- function(x, y){
   #                      lambda.1se = lambda that minimizes the CV error plus one standard error
   #   eNet_model object:    Elastic Net Model fitted with lambda.1se and alpha = 0.5,
   #                          This object can be used to predict new data.
-  
+
   # x is already standardize, so do not standardize it again
   eNet_cv <- cv.glmnet(as.matrix(x), y[,1], alpha = 0.5, standardize=FALSE)
   eNet_model <- glmnet(as.matrix(x), y[,1], alpha = 0.5, standardize=FALSE,
@@ -81,7 +85,7 @@ gam_m <- function(x,y){
   # penalized cubic splines with k=3 knots to avoid overfitting.
   #
   # Args:
-  #   x :   predictors (independent variables) matrix/df of the training, 
+  #   x :   predictors (independent variables) matrix/df of the training,
   #         centered to zero with a standard deviation of 1.
   #   y :   response (dependent or target) variable.
   # Returns:
@@ -91,8 +95,8 @@ gam_m <- function(x,y){
   #                      coefficients, residuals, deviance, fitted values
   #                      with this object the scatterplot smoothers can be obtained
   #                      and this object can be used to predict new values.
-  
-  
+
+
   # Create formula for fitting the GAM model with k=3 knots to avoid
   # overfitting.
   vars <- c()
@@ -120,11 +124,11 @@ gam_m <- function(x,y){
 # Non-Parametric Model - Kernel-based Regularized Least Squares (KRLS)
 
 krls_m <- function(x, y){
-  # Performs the KRLS Model, using LOOCV for learning the penalized lambda parameter, 
+  # Performs the KRLS Model, using LOOCV for learning the penalized lambda parameter,
   # Gaussian Kernel and the kernel bandwidth is set to dim(x), i.e. number of dimensions
   #
   # Args:
-  #   x :   predictors (independent variables) matrix/df of the training, 
+  #   x :   predictors (independent variables) matrix/df of the training,
   #         centered to zero with a standard deviation of 1.
   #   y :   response (dependent or target) variable.
   # Returns:
@@ -136,13 +140,13 @@ krls_m <- function(x, y){
   #                      with this object the Estimates of the conditional expectations
   #                      plots can be obtained
   #                      This object can be used to predict new values.
-  
+
   # KRLS also standardizes, but there is no parameter to avoid it if data is ready.
   # Double-standardization does not hurt, anyway.
-  krls_model <- KRLS::krls(X = as.matrix(x), y = y, whichkernel = "gaussian", 
+  krls_model <- KRLS::krls(X = as.matrix(x), y = y, whichkernel = "gaussian",
                            print.level = 0)
 
-  # TODO: Decide on best measure of KRLS LOOCV error  
+  # TODO: Decide on best measure of KRLS LOOCV error
   return(list(krls_model=krls_model))
 }
 
@@ -155,7 +159,7 @@ ridge_stack <- function(xmodels, y){
   # the parameters
   #
   # Args:
-  #   xmodels :   predictors (independent variables) matrix/df of the Models to stack, 
+  #   xmodels :   predictors (independent variables) matrix/df of the Models to stack,
   #               centered to zero with a standard deviation of 1.
   #         y :   response (dependent or target) variable.
   # Returns:
@@ -165,8 +169,8 @@ ridge_stack <- function(xmodels, y){
   #                      lambda.1se = lambda that minimizes the CV error plus one standard error
   #   ridge_model object:    Ridge Model fitted with lambda.1se,
   #                          This object can be used to predict new data.
- 
-  # x is already standardize, so do not do it again  
+
+  # x is already standardize, so do not do it again
   ridge_cv <- cv.glmnet(as.matrix(xmodels), k = 1, y[,1], alpha = 0, standardize=FALSE)
   ridge_model <- glmnet(as.matrix(xmodels),  y[,1], alpha = 0, standardize=FALSE,
                         lambda = ridge_cv$lambda.1se)
@@ -174,7 +178,7 @@ ridge_stack <- function(xmodels, y){
   lambda.1se_cv_rmse <- sqrt(ridge_cv$cvm[lambda.1se_index])
 
   return(list(ridge_cv = ridge_cv, ridge_model = ridge_model, ridge_cv_rmse <- lambda.1se_cv_rmse))
-  
+
 }
 
 

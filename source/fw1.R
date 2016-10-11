@@ -1,17 +1,21 @@
 #!/usr/bin/env Rscript
 ###############################################################################################
 #    Framework I :
-#     @description: Assess the combination of different either SFs or descriptors, separately, 
+#     @description: Assess the combination of different either SFs or descriptors, separately,
 #     using LASSO, Elastic Net, GAM and KRLS models.
-#     Provide tools to detect the possible subset of most significant variables, 
-#     analyze the independent interaction of each descriptor and SF with 
+#     Provide tools to detect the possible subset of most significant variables,
+#     analyze the independent interaction of each descriptor and SF with
 #     the protein- ligand binding affinity from different perspectives.
 #
-#     @details:
-#     @example: Rscript --vanilla fw1.R -a set1_sfs_.csv  -b set2_sfs.csv -c set2_sfs.cs
+#     @gGeneral Example:
+          Rscript --vanilla fw1.R -a sfs_training.csv  -b sfs_validation.csv -c sfs_newdata.csv
+#     @eExample with the data provided here:
+#         Rscript --vanilla fw1.R -a set1_sfs_.csv  -b set2_sfs.csv -c set2_sfs.csv
 #
-#     @author: Gabriela Hernández 
+#     @author: Gabriela Hernández
 #     EM-DMKM  2014-2016
+#     @contributions: Jorge ESTRADA
+#                     Jelisa IGLESIAS
 #     BSC-CNS  2016
 ###############################################################################################
 library(caret)
@@ -68,9 +72,9 @@ main <- function(opt)
     print_help(opt_parser)
     stop("At least the SFs or Descriptors training datasets must be supplied", call. = FALSE)
   }
-  
+
   ########################################################################################
-  # READING DATASETS 
+  # READING DATASETS
   # In this section, the datasets provided are read and processed.
   # If not validation set is provided, then stratified sampling on the training set is
   # performed, using 70% for training and 30% for validation.
@@ -84,8 +88,8 @@ main <- function(opt)
   # Predictors and Response variables separation for training
   xtrain <- train[, 2:train_n]
   ytrain <- train[ntrain]
-  
-  
+
+
   if (is.null(opt$val)){
     print("No validation dataset was provided, stratified sampling will be performed
           on the training dataset")
@@ -107,7 +111,7 @@ main <- function(opt)
     xval <- val[,2:train_n]
     yval <- val[ntrain]
   }
-  
+
   if(is.null(opt$newdata)){
     print("NO new data is provided")
   }else{
@@ -115,10 +119,10 @@ main <- function(opt)
     n_new <- length(newdata)
     xnew <- newdata[, 2:n_new]
   }
-  
+
   ########################################################################################
   # Pre-process
-  # Standardization (Z-score) of all the predictors is performed, centering all the 
+  # Standardization (Z-score) of all the predictors is performed, centering all the
   # variables to zero with standard deviation of 1. Use N as denominator for the standard
   # deviation
   ########################################################################################
@@ -131,26 +135,26 @@ main <- function(opt)
   xtrain.z <- as.data.frame(xtrain.z)
   ytrain <- as.data.frame(ytrain)
   colnames(ytrain)[1] <- "Experimental"
-  
+
   # Validation
   xval.z <- scale(xval, center=standardization_center, scale=standardization_scale)
   xval.z <- as.data.frame(xval.z)
   yval <- as.data.frame(yval)
   colnames(yval)[1] <- "Experimental"
-  
+
   # New data
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)) {
     xnew.z <- scale(xnew, center=standardization_center, scale=standardization_scale)
     xnew.z <- as.data.frame(xnew.z)
   }
-  
-  
+
+
   ########################################################################################
   # MODELS Computation
   # Compute the models LASSO, Elastic Net, GAM and KRLS for descriptors and if
   # demanded for SFs as well
   ########################################################################################
-  
+
   print(paste("Learning Models..."))
   # LASSO
   lasso_model <- lasso(x = xtrain.z, y = ytrain)
@@ -166,22 +170,22 @@ main <- function(opt)
   krls_error <- predict(krls_model$krls_model, xtrain.z)
   krls_error <- evaluation(krls_error$fit, ytrain)
   krls_error <- round(krls_error$RMSE, 3)
-  
-  
+
+
   ########################################################################################
   # Predictions in the validation dataset (SFs or Descriptors) and if it is provided in
   # the Newdata dataset
   ########################################################################################
-  
+
   # Validation Set
   print(paste("Evaluation of the models..."))
   val_lasso <- predict(lasso_model$lasso_model,  newx = as.matrix(xval.z))
   val_eNet <- predict(eNet_model$eNet_model, newx = as.matrix(xval.z))
   val_gam <- predict(gam_model$gam_model, newdata = xval.z)
   val_krls <- predict(krls_model$krls_model, newdata = as.matrix(xval.z))
-  
+
   if(!is.null(opt$newdata)){
-    # If xnew is not null, then prediction of the new dataset is performed, 
+    # If xnew is not null, then prediction of the new dataset is performed,
     # output will be stored as newdata_predictions.csv into the same folder
     print(paste("Prediction of the New Dataset, output will be stored as newdata_predictions.csv into the same folder!"))
     new_lasso <- predict(lasso_model$lasso_model, newx = as.matrix(xnew.z))
@@ -192,21 +196,21 @@ main <- function(opt)
     colnames(df_pred) <- c("LASSO", "Elastic_Net", "GAM", "KRLS")
     write.csv(df_pred, "predictions.csv")
   }
-  
-  
+
+
   eval_lasso <- evaluation(val_lasso[,1], yval)
   eval_eNet <- evaluation(val_eNet[,1], yval)
   eval_gam <- evaluation(val_gam, yval)
   eval_krls <- evaluation(val_krls$fit, yval)
-  
-  
-  
-  
+
+
+
+
   # Features Selected by LASSO and Elastic Net with beta Coefficients
   lasso_vars <- lasso_model$lasso_model$beta[which(lasso_model$lasso_model$beta!= 0),]
   eNet_vars <- eNet_model$eNet_model$beta[which(eNet_model$eNet_model$beta!= 0),]
-  
-  
+
+
   # Print the evaluations
   print(paste("LASSO Training Error (RMSE):"))
   print(round(lasso_error, 3))
@@ -236,8 +240,8 @@ main <- function(opt)
   print(lasso_vars)
   print(paste("Features Selected by Elastic Net:"))
   print(eNet_vars)
-  
-  
+
+
   # Report the plots of all the models in PDF
   pdf("Models_Plots.pdf")
   par(mfrow=c(2,2))
@@ -250,7 +254,7 @@ main <- function(opt)
   plot(gam_model$gam_model, scheme = 1,residuals=TRUE, all.terms = TRUE)
   par(mfrow=c(2,2))
   plot(krls_model$krls_model)
-  dev.off()  
+  dev.off()
 }
 
 ########################################################################################
@@ -263,9 +267,9 @@ getParser <- function() {
   option_list = list(
     make_option(c("-a", "--train"), type = "character", default = NULL,
                 help = "Training dataset (SFs or Descriptors) REQUIRED", metavar = "csv file"),
-    make_option(c("-b", "--val"), type = "character", default = NULL, 
+    make_option(c("-b", "--val"), type = "character", default = NULL,
                 help = "Validation dataset (SFs or Descriptors) OPTIONAL", metavar = "csv file"),
-    make_option(c("-c", "--newdata"), type = "character", default = NULL, 
+    make_option(c("-c", "--newdata"), type = "character", default = NULL,
                 help = "New Data dataset (SFs or Descriptors) OPTIONAL", metavar = "csv file")
   );
 
@@ -283,10 +287,10 @@ getParser <- function() {
 # When running from the command line, the option will become, by default, TRUE,
 # and options will be obtained from the command line.
 if (getOption('run.commandline', default=TRUE)) {
-  
+
   opt_parser <- getParser();
   opt = parse_args(opt_parser);
-  
+
   set.seed(1234)
-  main(opt)  
+  main(opt)
 }

@@ -1,12 +1,17 @@
 #!/usr/bin/env Rscript
 ########################################################################################
 # STACKING FRAMEWORK
+# @description: In this script, the stacking procedure is performed. First the SFs and
+#               descriptors are assessed with the four models: LASSO, Elastic Net, GAM
+#               and KRLS; the best model for SFs & descriptors is chosen to later stack
+#               them by using a Ridge Regression Stacking procedure.
+# @example with validation dataset: Rscript --vanilla fw2.R -a set1_sfs.csv -b set2_sfs.csv
+#           -d set1_all_descriptors.csv -e set2_all_descriptors.csv
 # @author: Gabriela HERNANDEZ LARIOS
-# @description: 
-# @example with
-# @example with validation dataset: Rscript --vanilla stacking.R -a set1_sfs.csv -b set2_sfs.csv 
-#           -d set1_all_descriptors.csv -e set2_all_descriptors.csv 
-#
+# EM-DMKM   2014-2016
+# @contributions: Jorge ESTRADA
+#                 Jelisa IGLESIAS
+# BSC-CNS 2016
 # ######################################################################################
 library(caret)
 library(hydroGOF)
@@ -63,9 +68,9 @@ main <- function(opt)
     print_help(opt_parser)
     stop("At least the SFs and Descriptors training datasets must be supplied", call. = FALSE)
   }
-  
+
   ########################################################################################
-  # READING DATASETS 
+  # READING DATASETS
   # In this section, the datasets provided are read and processed.
   # If not validation sets are provided, then stratified sampling on the training sets is
   # performed, using 70% for training and 30% for validation.
@@ -86,7 +91,7 @@ main <- function(opt)
   # Predictors and Response variables separation for descriptors
   xdes <- des[,2:des_n]
   ydes <- des[ndes]
-  
+
   if (is.null(opt$sfs_val) | is.null(opt$des_val)){
     print("No validation datasets were provided, stratified sampling will be performed
           on the SFs and Descriptors training datasets")
@@ -131,18 +136,18 @@ main <- function(opt)
     # use the last column in the new_data file as the experimental values for this
     # and compute the statistics.
     if (is.null(opt$new_data)){
-      # Scoring Functions 
+      # Scoring Functions
       sfs_new <- read.csv(opt$sfs_new, header = TRUE)
       nsfs_new <- length(sfs_new)
       xsfs_new <- sfs_new[, 2:nsfs_new]
-      
+
       # Descriptors
       des_new <- read.csv(opt$des_new, header = TRUE)
       ndes_new <- length(des_new)
       xdes_new <- des_new[, 2:ndes_new]
     }
     else{
-      # Scoring Functions 
+      # Scoring Functions
       sfs_new <- read.csv(opt$sfs_new, header = TRUE)
       nsfs_new_all <- length(sfs_new)
       nsfs_new <- nsfs_new_all - 1
@@ -158,10 +163,10 @@ main <- function(opt)
       ydes_new <- as.data.frame(ydes_new)
     }
   }
-  
+
   ########################################################################################
   # Pre-process Phase
-  # Standardization (Z-score) of all the predictors is performed, centering all the 
+  # Standardization (Z-score) of all the predictors is performed, centering all the
   # variables to zero with standard deviation on 1. Use N as denominator for the standard
   # deviation
   ########################################################################################
@@ -181,13 +186,13 @@ main <- function(opt)
     xsfs_new.z <- scale(xsfs_new, center=sfs_standardization_center, scale=sfs_standardization_scale)
     xsfs_new.z <- as.data.frame(xsfs_new.z)
   }
-  
+
   colnames(ysfs)[1] <- "Experimental"
   colnames(ysfs_val)[1] <- "Experimental"
   if (!is.null(opt$new_data)) {
     colnames(ysfs_new)[1] <- "Experimental"
   }
-  
+
   # Descriptors
   des_standardization_center <- apply(xdes, 2, mean)
   des_xtrain_variance <- apply(xdes, 2, var)
@@ -202,77 +207,77 @@ main <- function(opt)
     xdes_new.z <- scale(xdes_new, center=des_standardization_center, scale=des_standardization_scale)
     xdes_new.z <- as.data.frame(xdes_new.z)
   }
-  
+
   colnames(ydes)[1] <- "Experimental"
   colnames(ydes_val)[1] <- "Experimental"
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new) & !is.null(opt$new_data)) {
     colnames(ydes_new)[1] <- "Experimental"
   }
-  
+
   # ALL
   xall.z <- cbind(xsfs.z, xdes.z)
   yall <- ydes
   xall_val.z <- cbind(xsfs_val.z, xdes_val.z)
   yall_val <- ydes_val
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)) {
-    xall_new.z <- cbind(xsfs_new.z, xdes_new.z)    
+    xall_new.z <- cbind(xsfs_new.z, xdes_new.z)
   }
-  
-  
+
+
   ########################################################################################
   # MODELS Computation
   # Compute the models LASSO, Elastic Net, GAM and KRLS for descriptors and if
   # demanded for SFs as well
   ########################################################################################
-  
+
   print(paste("Learning Models for descriptors and SFs..."))
-  
+
   # Learning Process for Descriptors
-  
+
   #  LASSO
   lasso_des <- lasso(x = xall.z, y = yall)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models
-  #lasso_error_des_train <- sqrt(mean(lasso_des$lasso_cv$cvm)) 
+  #lasso_error_des_train <- sqrt(mean(lasso_des$lasso_cv$cvm))
   lasso_error_pred <- predict(lasso_des$lasso_model,  newx = as.matrix(xall_val.z))
   lasso_error_des <- rmse(as.numeric(lasso_error_pred[,1]),yall_val[,1])
-  
+
   # Elastic Net
   eNet_des <- eNet(x = xall.z, y = yall)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models
   #eNet_error_des_train <- sqrt(mean(eNet_des$eNet_cv$cvm))
   eNet_error_pred <- predict(eNet_des$eNet_model,  newx = as.matrix(xall_val.z))
   eNet_error_des <- rmse(as.numeric(eNet_error_pred[,1]), yall_val[,1])
-  
+
   # GAM
   gam_des <- gam_m(xall.z, yall)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models
   # gam_error_des_train <- sqrt(mean(gam_des$gam_model$gcv.ubre))
   gam_error_pred <- predict(gam_des$gam_model, xall_val.z)
   gam_error_des <- rmse(as.numeric(gam_error_pred), yall_val[,1])
-  
-  
+
+
   # KRLS
   krls_des <- krls_m(xall.z, yall)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models
   #krls_error_des_train <- (krls_des$krls_model$Looe[,1])/nrow(xall.z)
   krls_error_pred <- predict(krls_des$krls_model, xall_val.z)
   krls_error_des <- rmse(krls_error_pred$fit, yall_val)
-  
-  # Choose the Best Model 
+
+  # Choose the Best Model
   models <- c("LASSO", "ElasticNet", "GAM", "KRLS")
   performance_vec <- c(lasso_error_des, eNet_error_des, gam_error_des, krls_error_des)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models, default is to use a validation set.
   # performance_vec <- c(lasso_error_des_train, eNet_error_des_train, gam_error_des_train, krls_error_des_train)
   best_model_all <- which.min(performance_vec)
   print("Best Model of the combination of SFs and Descriptors together:")
   print(models[best_model_all])
-  
-  
+
+
   # Best Model: LASSO
   if(best_model_all == 1){
     best_train_all <- predict(lasso_des$lasso_model, newx = as.matrix(xall.z))
@@ -281,7 +286,7 @@ main <- function(opt)
       best_new_all <- predict(lasso_des$lasso_model, newx = as.matrix(xall_new.z))
     }
   }
-  
+
   # Best Model: Elastic Net
   if(best_model_all == 2){
     best_train_all <- predict(eNet_des$eNet_model, newx = as.matrix(xall.z))
@@ -290,7 +295,7 @@ main <- function(opt)
       best_new_all <- predict(eNet_des$eNet_model, newx = as.matrix(xall_new.z))
     }
   }
-  
+
   # Best Model: GAM
   if(best_model_all == 3){
     best_train_all <- predict(gam_des$gam_model,  xall.z)
@@ -299,7 +304,7 @@ main <- function(opt)
       best_new_all <- predict(gam_des$gam_model, xall_new.z)
     }
   }
-  
+
   # Best Model: KRLS
   if(best_model_all == 4){
     best_train_all <- predict(krls_des$krls_model, xall.z)
@@ -311,53 +316,53 @@ main <- function(opt)
       best_new_all <- best_new_all$fit
     }
   }
-  
-  
+
+
   # LEARNING MODELS FOR SFs
   print("Learning Models for SFs...")
-  
+
   # LASSO
   lasso_sfs <- lasso(x = xsfs.z, y = ysfs)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models
   # lasso_error_sfs_train <- lasso_sfs$lasso_cv_rmse
   lasso_error_sfs_pred <- predict(lasso_sfs$lasso_model, newx = as.matrix(xsfs_val.z))
   lasso_error_sfs <- rmse(as.numeric(lasso_error_sfs_pred[,1]), ysfs_val[,1])
-  
+
   # Elastic Net
   eNet_sfs <- eNet(x = xsfs.z, y = ysfs)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models
   # eNet_error_sfs_train <- eNet_sfs$eNet_cv_rmse
   eNet_error_sfs_pred <- predict(eNet_sfs$eNet_model, newx = as.matrix(xsfs_val.z))
   eNet_error_sfs <- rmse(as.numeric(eNet_error_sfs_pred[,1]), ysfs_val[,1])
-  
+
   # GAM
   gam_sfs <- gam_m(xsfs.z, ysfs)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models
   # gam_error_sfs_train <- gam_sfs$gam_cv_rmse
   gam_error_sfs_pred <- predict(gam_sfs$gam_model,xsfs_val.z)
   gam_error_sfs <- rmse(as.numeric(gam_error_sfs_pred), ysfs_val[,1])
-  
+
   # KRLS
   krls_sfs <- krls_m(xsfs.z, ysfs)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models
   #krls_error_sfs_train <- (krls_sfs$krls_model$Looe[,1])/nrow(xsfs.z)
   krls_error_sfs_pred <- predict(krls_sfs$krls_model, xsfs_val.z)
   krls_error_sfs <- rmse(krls_error_sfs_pred$fit, ysfs_val)
-  
+
   models <- c("LASSO", "ElasticNet", "GAM", "KRLS")
   performance_vec_sfs <- c(lasso_error_sfs, eNet_error_sfs, gam_error_sfs, krls_error_sfs)
-  # Uncomment the bellow  line if you want to use the error in the training 
+  # Uncomment the bellow  line if you want to use the error in the training
   # for choosing the best models, default is to use a validation set.
   #performance_vec_sfs <- c(lasso_error_sfs_train, eNet_error_sfs_train, gam_error_sfs_train, krls_error_sfs_train)
-  best_model_sfs <- which.min(performance_vec_sfs) 
+  best_model_sfs <- which.min(performance_vec_sfs)
   print("Best Model of the combination of only SFs:")
   print(models[best_model_sfs])
-  
-  
+
+
   # Best Model: LASSO
   if(best_model_sfs == 1){
     best_train_sfs <- predict(lasso_sfs$lasso_model, newx = xsfs.z)
@@ -366,7 +371,7 @@ main <- function(opt)
       best_new_sfs <- predict(lasso_sfs$lasso_model, newx = xsfs_new.z)
     }
   }
-  
+
   # Best Model: Elastic Net
   if(best_model_sfs == 2){
     best_train_sfs <- predict(eNet_sfs$eNet_model, newx = xsfs.z)
@@ -375,7 +380,7 @@ main <- function(opt)
       best_new_sfs <- predict(eNet_sfs$eNet_model, newx = xsfs_new.z)
     }
   }
-  
+
   # Best Model: GAM
   if(best_model_sfs == 3){
     best_train_sfs <- predict(gam_sfs$gam_model,  xsfs.z)
@@ -384,7 +389,7 @@ main <- function(opt)
       best_new_sfs <- predict(gam_sfs$gam_model, xsfs_new.z)
     }
   }
-  
+
   # Best Model: KRLS
   if(best_model_sfs == 4){
     best_train_sfs <- predict(krls_sfs$krls_model, xsfs.z)
@@ -396,16 +401,16 @@ main <- function(opt)
       best_new_sfs <- best_new_sfs$fit
     }
   }
-  
-  
+
+
   ########################################################################################
   # STACKING PROCEDURE
-  # Compute the stacking process, using Ridge regression, either for the best model of 
+  # Compute the stacking process, using Ridge regression, either for the best model of
   # the SFs and descriptors or for a set of SFs with the best model of descriptors.
   ########################################################################################
   # Stacking Best Models of SFs and Descriptors
   print("Learning Ridge Regression Stacking...")
-  
+
   # Models For Training
   xmodels_train <- cbind(best_train_sfs, best_train_all)
   colnames(xmodels_train) <- c("Best_sfs", "Best_all")
@@ -414,12 +419,12 @@ main <- function(opt)
   xmodels_train_variance <- apply(xmodels_train, 2, var)
   xmodels_train_datapoints <- nrow(xmodels_train)
   stacking_standardization_scale <- sqrt((xmodels_train_datapoints-1)/xmodels_train_datapoints)*sqrt(xmodels_train_variance)
-  
+
   xmodels_train <- scale(xmodels_train, center=stacking_standardization_center,
                          scale=stacking_standardization_scale)
   xmodels_train <- as.data.frame(xmodels_train)
   ymodels_train <- ysfs
-  
+
   # Models For Validation
   xmodels_val <- cbind(best_val_sfs, best_val_all)
   colnames(xmodels_val) <- c("Best_sfs", "Best_all")
@@ -427,7 +432,7 @@ main <- function(opt)
                        scale=stacking_standardization_scale)
   xmodels_val <- as.data.frame(xmodels_val)
   ymodels_val <- ysfs_val
-  
+
   # Models For New data (if there is)
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
     xmodels_new <- cbind(best_new_sfs, best_new_all)
@@ -436,8 +441,8 @@ main <- function(opt)
                          scale=stacking_standardization_scale)
     xmodels_new <- as.data.frame(xmodels_new)
   }
-  
-  
+
+
   # Ridge Stacking Learning
   ridge_stack_model <- ridge_stack(xmodels_train, ymodels_train)
   # Ridge Stacking Prediction on Validation set
@@ -449,8 +454,8 @@ main <- function(opt)
     colnames(newdata_results) <- c("Best_SFs", "Best_SFs_Des", "Ridge_Stack")
     write.csv(newdata_results, "newdata_predictions.csv")
   }
-  
-  
+
+
   ########################################################################################
   # PERFORMANCE RESULTS AND EVALUATION
   # The performance results on the validation set are always provided in terms of
@@ -467,45 +472,45 @@ main <- function(opt)
   print(cor(best_val_sfs, ymodels_val[,1]))
   print("RMSE:")
   print(rmse(as.numeric(best_val_sfs), ymodels_val[,1]))
-  
+
   print("Evaluation SFs + descriptors")
   print("Pearson Correlation:")
   print(cor(best_val_all, ymodels_val[,1]))
   print("RMSE:")
   print(rmse(as.numeric(best_val_all), ymodels_val[,1]))
-  
+
   print("Evaluation Ridge")
   print("Pearson Correlation:")
   print(cor(stack_val_res[,1], ymodels_val[,1]))
   print("RMSE:")
   print(rmse(stack_val_res[,1], ymodels_val[,1]))
-  
+
   if (!is.null(opt$new_data)){
     print("Statistics for the predicted values:")
-    
+
     print("Evaluation SFs")
     print("Pearson Correlation:")
     print(cor(newdata_results[,1], ysfs_new[,1]))
     print("RMSE:")
     print(rmse(newdata_results[,1], ysfs_new[,1]))
-    
+
     print("Evaluation SFs + descriptors")
     print("Pearson Correlation:")
     print(cor(newdata_results[,2], ysfs_new[,1]))
     print("RMSE:")
     print(rmse(as.numeric(newdata_results[,2]),ysfs_new[,1]))
-    
+
     print("Evaluation Ridge")
     print("Pearson Correlation:")
     print(cor(newdata_results[,3], ysfs_new[,1]))
     print("RMSE:")
     print(rmse(newdata_results[,3], ysfs_new[,1]))
-    
+
   }
-  
-  
+
+
   ########################################################################################
-  # Reports with Plots in PDF 
+  # Reports with Plots in PDF
   ########################################################################################
   pdf("SFs_Results.pdf")
   par(mfrow=c(2,2))
@@ -519,7 +524,7 @@ main <- function(opt)
   par(mfrow=c(2,2))
   plot(krls_sfs$krls_model)
   dev.off()
-  
+
   pdf("Descriptors_SFs_Results.pdf")
   par(mfrow=c(2,2))
   plot(lasso_des$lasso_cv$glmnet.fit, "lambda", label=TRUE, main = "LASSO 10-Fold CV Lambda")
@@ -532,7 +537,7 @@ main <- function(opt)
   par(mfrow=c(2,2))
   plot(krls_des$krls_model)
   dev.off()
-  
+
   pdf("Stacking_Results.pdf")
   plot(ridge_stack_model$ridge_cv$glmnet.fit, "lambda", label=TRUE, main = "Ridge 1 Fold CV Lambda")
   plot(ridge_stack_model$ridge_cv, main = "Ridge shrinkage of coefficients")
@@ -549,20 +554,21 @@ getParser <- function() {
   option_list = list(
     make_option(c("-a", "--sfs"), type = "character", default = NULL,
                 help = "SFs Training dataset REQUIRED", metavar = "csv file"),
-    make_option(c("-b", "--sfs_val"), type = "character", default = NULL, 
+    make_option(c("-b", "--sfs_val"), type = "character", default = NULL,
                 help = "SFs Validation dataset OPTIONAL", metavar = "csv file"),
-    make_option(c("-c", "--sfs_new"), type = "character", default = NULL, 
+    make_option(c("-c", "--sfs_new"), type = "character", default = NULL,
                 help = "SFs New Data dataset OPTIONAL", metavar = "csv file"),
-    make_option(c("-d", "--des"), type = "character", default = NULL, 
+    make_option(c("-d", "--des"), type = "character", default = NULL,
                 help = "Descriptors Training dataset REQUIRED", metavar = "csv file"),
-    make_option(c("-e", "--des_val"), type = "character", default = NULL, 
+    make_option(c("-e", "--des_val"), type = "character", default = NULL,
                 help = "Descriptors Validation dataset OPTIONAL", metavar = "csv file"),
-    make_option(c("-f", "--des_new"), type = "character", default = NULL, 
+    make_option(c("-f", "--des_new"), type = "character", default = NULL,
                 help = "Descriptors New Data dataset OPTIONAL", metavar = "csv file"),
     make_option(c("-g","--new_data"), action = "store_true", default = NULL,
-                help = "A flag that allows for experimental energies in the new_data files. Should be only used with new_data values")
+                help = "A flag that allows for experimental energies in the new_data files.
+                Should be only used with new_data values")
   );
-  
+
   OptionParser(option_list = option_list);
 }
 
@@ -578,10 +584,10 @@ getParser <- function() {
 # When running from the command line, the option will become, by default, TRUE,
 # and options will be obtained from the command line.
 if (getOption('run.commandline', default=TRUE)) {
-  
+
   opt_parser <- getParser();
   opt = parse_args(opt_parser);
-  
+
   set.seed(1234)
-  main(opt)  
+  main(opt)
 }
