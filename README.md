@@ -1,7 +1,7 @@
 # Protein-Ligand Binding Affinity Prediction
 
 ===================================================================================================================================
-=                                                        Description
+                                                         Description
 ===================================================================================================================================
 Predicting protein-ligand binding affinity constitutes a key computational method in the early stages of the drug discovery process. Molecular docking programs attempt to predict them by using mathematical approximations, namely, scoring functions. Constantly, new experiments and techniques are carried out in order to find out crucial descriptors that better characterize the protein-ligand interaction. In this work, we investigate and apply different machine learning and statistical techniques to create a novel
 framework capable of combining different descriptors as well as scoring functions in order to both estimate and improve the overall binding affinity. This strategy also filters the strongest descriptors and scoring functions while permitting more complex 
@@ -18,7 +18,7 @@ Documentation.
 
 
 ===================================================================================================================================
-=                                                         Requirements
+                                                           Requirements
 ===================================================================================================================================
 The scripts were implemented in R 3.1.4 using the following libraries:
 
@@ -31,7 +31,7 @@ The scripts were implemented in R 3.1.4 using the following libraries:
   -hydroGOF
 
 ===================================================================================================================================
-=                                   Information about the files, Execution & Reproducibility
+                                     Information about the files, Execution & Reproducibility
 ===================================================================================================================================
 This repository contains the following three folders:
 
@@ -131,7 +131,7 @@ This repository contains the following three folders:
                           fw1.R & fw2, 
       
 ===================================================================================================================================
-=                                             Execution
+                                               Execution
 ===================================================================================================================================
 
 From the terminal/CMD change directory to the project and execute either the fw1.R script or the fw2.R script as follows:
